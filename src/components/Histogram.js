@@ -195,6 +195,220 @@ const Histogram = () => {
     ctx.putImageData(imageData, 0, 0);
   };
 
+  const applyEntropySelection = () => {
+    const histogram = new Array(256).fill(0);
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+  
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = Math.round((data[i] + data[i + 1] + data[i + 2]) / 3);
+      histogram[gray]++;
+    }
+  
+    const totalPixels = data.length / 4;
+  
+    let maxEntropy = -Infinity;
+    let bestThreshold = 0;
+  
+    for (let t = 0; t < 256; t++) {
+      let p1 = 0, p2 = 0;
+      for (let i = 0; i <= t; i++) p1 += histogram[i];
+      for (let i = t + 1; i < 256; i++) p2 += histogram[i];
+  
+      p1 /= totalPixels;
+      p2 /= totalPixels;
+  
+      if (p1 === 0 || p2 === 0) continue;
+  
+      // Oblicz entropie
+      let h1 = 0, h2 = 0;
+      for (let i = 0; i <= t; i++) {
+        const p = histogram[i] / (p1 * totalPixels);
+        if (p > 0) h1 -= p * Math.log2(p);
+      }
+      for (let i = t + 1; i < 256; i++) {
+        const p = histogram[i] / (p2 * totalPixels);
+        if (p > 0) h2 -= p * Math.log2(p);
+      }
+  
+      const entropy = h1 + h2;
+      if (entropy > maxEntropy) {
+        maxEntropy = entropy;
+        bestThreshold = t;
+      }
+    }
+
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = Math.round((data[i] + data[i + 1] + data[i + 2]) / 3);
+      const binary = gray <= bestThreshold ? 0 : 255;
+  
+      data[i] = binary; // R
+      data[i + 1] = binary; // G
+      data[i + 2] = binary; // B
+    }
+  
+    ctx.putImageData(imageData, 0, 0);
+  };
+
+  const applyMinimumError = () => {
+    const histogram = new Array(256).fill(0);
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+  
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = Math.round((data[i] + data[i + 1] + data[i + 2]) / 3);
+      histogram[gray]++;
+    }
+  
+    const totalPixels = data.length / 4;
+  
+    let bestThreshold = 0;
+    let minError = Infinity;
+  
+    for (let t = 0; t < 256; t++) {
+      let w1 = 0;
+      let m1 = 0;
+      for (let i = 0; i <= t; i++) {
+        w1 += histogram[i];
+        m1 += i * histogram[i];
+      }
+      if (w1 > 0) m1 /= w1;
+  
+      let w2 = 0;
+      let m2 = 0;
+      for (let i = t + 1; i < 256; i++) {
+        w2 += histogram[i];
+        m2 += i * histogram[i];
+      }
+      if (w2 > 0) m2 /= w2;
+  
+      w1 /= totalPixels;
+      w2 /= totalPixels;
+  
+      let variance1 = 0;
+      for (let i = 0; i <= t; i++) {
+        variance1 += Math.pow(i - m1, 2) * histogram[i];
+      }
+      if (w1 > 0) variance1 /= w1 * totalPixels;
+  
+      let variance2 = 0;
+      for (let i = t + 1; i < 256; i++) {
+        variance2 += Math.pow(i - m2, 2) * histogram[i];
+      }
+      if (w2 > 0) variance2 /= w2 * totalPixels;
+  
+      if (variance1 === 0 || variance2 === 0) continue;
+  
+      const error = w1 * Math.log(variance1) + w2 * Math.log(variance2);
+  
+      if (error < minError) {
+        minError = error;
+        bestThreshold = t;
+      }
+    }
+
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = Math.round((data[i] + data[i + 1] + data[i + 2]) / 3);
+      const binary = gray <= bestThreshold ? 0 : 255;
+  
+      data[i] = binary; // R
+      data[i + 1] = binary; // G
+      data[i + 2] = binary; // B
+    }
+  
+    ctx.putImageData(imageData, 0, 0);
+  };
+
+  const applyFuzzyMinimumError = () => {
+    const histogram = new Array(256).fill(0);
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+  
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = Math.round((data[i] + data[i + 1] + data[i + 2]) / 3);
+      histogram[gray]++;
+    }
+  
+    const totalPixels = data.length / 4;
+    for (let i = 0; i < 256; i++) {
+      histogram[i] /= totalPixels;
+    }
+  
+    let minFuzzyError = Infinity;
+    let bestThreshold = 0;
+  
+    for (let t = 0; t < 256; t++) {
+      let w1 = 0,
+        w2 = 0,
+        m1 = 0,
+        m2 = 0;
+  
+      for (let i = 0; i <= t; i++) {
+        w1 += histogram[i];
+        m1 += i * histogram[i];
+      }
+      if (w1 > 0) m1 /= w1;
+  
+      for (let i = t + 1; i < 256; i++) {
+        w2 += histogram[i];
+        m2 += i * histogram[i];
+      }
+      if (w2 > 0) m2 /= w2;
+  
+      let variance1 = 0,
+        variance2 = 0;
+      for (let i = 0; i <= t; i++) {
+        variance1 += histogram[i] * Math.pow(i - m1, 2);
+      }
+      for (let i = t + 1; i < 256; i++) {
+        variance2 += histogram[i] * Math.pow(i - m2, 2);
+      }
+  
+      if (w1 > 0) variance1 /= w1;
+      if (w2 > 0) variance2 /= w2;
+  
+      if (variance1 === 0 || variance2 === 0) continue;
+  
+      let fuzzyError = 0;
+      for (let i = 0; i < 256; i++) {
+        const p1 = Math.exp(-Math.pow(i - m1, 2) / (2 * variance1));
+        const p2 = Math.exp(-Math.pow(i - m2, 2) / (2 * variance2));
+        const totalP = p1 + p2;
+  
+        if (totalP === 0) continue;
+  
+        const mu1 = p1 / totalP;
+        const mu2 = p2 / totalP;
+  
+        if (mu1 > 0) fuzzyError += histogram[i] * mu1 * Math.log(mu1);
+        if (mu2 > 0) fuzzyError += histogram[i] * mu2 * Math.log(mu2);
+      }
+  
+      if (fuzzyError < minFuzzyError) {
+        minFuzzyError = fuzzyError;
+        bestThreshold = t;
+      }
+    }
+  
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = Math.round((data[i] + data[i + 1] + data[i + 2]) / 3);
+      const binary = gray <= bestThreshold ? 0 : 255;
+  
+      data[i] = binary; // R
+      data[i + 1] = binary; // G
+      data[i + 2] = binary; // B
+    }
+  
+    ctx.putImageData(imageData, 0, 0);
+  };
+  
+  
   return (
     <div>
       <h1>Histogram Generator</h1>
@@ -230,6 +444,15 @@ const Histogram = () => {
         </div>
         <div>
           <button onClick={applyIterativeMean}>Binaryzacja Iterative Mean</button>
+        </div>
+        <div>
+          <button onClick={applyEntropySelection}>Binaryzacja Selekcja entropii</button>
+        </div>
+        <div>
+          <button onClick={applyMinimumError}>Binaryzacja Błąd Minimalny</button>
+        </div>
+        <div>
+          <button onClick={applyFuzzyMinimumError}>Binaryzacja rozmytego błędu minimalnego</button>
         </div>
       </div>
       <button onClick={applyManualThreshold}>Binaryzacja z progiem ręcznym</button>
