@@ -179,7 +179,7 @@ const Histogram = () => {
 
       newThreshold = (lowerMean + upperMean) / 2;
 
-      if (Math.abs(newThreshold - threshold) < 1) break; // Sprawdzenie stabilności
+      if (Math.abs(newThreshold - threshold) < 1) break;
       threshold = newThreshold;
     } while (true);
 
